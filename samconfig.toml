@@ -1,0 +1,10 @@
+version = 0.1
+[default.deploy.parameters]
+stack_name = "sam-app-batch"
+resolve_s3 = true
+s3_prefix = "sam-app-batch"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "SESSender=\"lgustavor@hotmail.com\" SESRecipient=\"lgustavor@hotmail.com\" SESIdentityName=\"lgustavor@hotmail.com\" InputArchiveFolder=\"lgustavor@hotmail.com\" FileChunkSize=\"600\" FileDelimiter=\",\""
+image_repositories = []

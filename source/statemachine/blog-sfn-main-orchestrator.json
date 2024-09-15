@@ -1,0 +1,82 @@
+{
+  "Comment": "State machine for batch processing",
+  "StartAt": "Split Input File into chunks",
+  "States": {
+    "Split Input File into chunks": {
+      "Type": "Task",
+      "ResultPath": "$.splitOutput",
+      "Resource": "${SplitInputFileFunctionArn}",
+      "Next": "Call Step function for each chunk"
+    },
+    "Call Step function for each chunk": {
+      "Type": "Map",
+      "Next": "Merge all Files",
+      "ItemsPath": "$.splitOutput.splitFileNames",
+      "ResultPath": null,
+      "Parameters": {
+        "FilePath.$": "$$.Map.Item.Value",
+        "FileIndex.$": "$$.Map.Item.Index"
+      },
+      "Iterator": {
+        "StartAt": "Call Chunk Processor Workflow",
+        "States": {
+          "Call Chunk Processor Workflow": {
+           "Type":"Task",
+           "Resource":"arn:aws:states:::states:startExecution.sync:2",
+           "Parameters":{
+              "Input":{
+                "input": {
+                  "FilePath.$": "$.FilePath"
+                }
+               },
+              "StateMachineArn":"${BlogBatchProcessChunkArn}"
+           },
+           "End":true
+        }
+        }
+      }
+    },
+    "Merge all Files": {
+      "Type": "Task",
+      "Resource": "${MergeS3FilesFunctionArn}",
+      "Parameters": {
+        "toProcessFolder.$": "$.splitOutput.toProcessFolder",
+        "bucket.$": "$.splitOutput.bucket",
+        "key.$" : "$.splitOutput.key"
+      },
+      "ResultPath": "$.mergeResponse",
+      "Next": "Email the file",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "Email the file": {
+      "Type": "Task",
+      "Resource": "${SendEmailFunctionArn}",
+      "Parameters": {
+        "sender": "${SESSender}",
+        "recipient": "${SESRecipient}",
+        "bucket.$": "$.splitOutput.bucket",
+        "s3OutputFileName.$": "$.mergeResponse.S3OutputFileName"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "End": true
+    }
+  }
+}
